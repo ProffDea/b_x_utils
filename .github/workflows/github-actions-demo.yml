@@ -11,8 +11,7 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
-      - name: Check out repository code
-        uses: actions/checkout@v6
+      - uses: actions/checkout@v6
       - run: |
           echo "🎉 The job was automatically triggered by a ${{ github.event_name }} event."
           echo "🐧 This job is now running on a ${{ runner.os }} server hosted by GitHub!"
@@ -22,4 +21,5 @@ jobs:
           ls ${{ github.workspace }}
           echo "🍏 This job's status is ${{ job.status }}."
           echo "tag ${{ github.ref_name }}"
+          which zip
           gh release create ${{ github.ref_name}}
