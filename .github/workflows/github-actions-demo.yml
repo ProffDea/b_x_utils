@@ -1,3 +1,10 @@
+# This workflow will publish a release with a usuable blender addon build for
+# windows and linux. This is accomplished roughly with the steps below:
+# - go into /home/runner/work/b_x_utils/b_x_utils with ${{ github.workspace }}
+# - compile zig module
+# - zip up the directory with the included build while excluding some files.
+#   Currently *.rdb, *.rfc, .git/, .github/, and the zig_modules/src/ folder are
+#   excluded.
 name: Publish
 on:
   push:
@@ -12,6 +19,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v6
+      - uses: mlugg/setup-zig@v2
       - run: |
           echo "🎉 The job was automatically triggered by a ${{ github.event_name }} event."
           echo "🐧 This job is now running on a ${{ runner.os }} server hosted by GitHub!"
@@ -22,5 +30,9 @@ jobs:
           echo "🍏 This job's status is ${{ job.status }}."
           echo "tag ${{ github.ref_name }}"
           echo "github.workspace = ${{ github.workspace }}"
-          which zip
-          gh release create ${{ github.ref_name}}
+          cd ${{ github.workspace }}
+          cd py_modules/zig_modules/src
+          zig build --release=safe -p .. --prefix-lib-dir .
+          cd ../../..
+          zip -r b_x_utils.zip * -x "*.rfc" "*.rdb" ".git/*" ".github/*" "py_modules/zig_modules/src/*"
+          gh release create ${{ github.ref_name}} b_x_utils.zip
