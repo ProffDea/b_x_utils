@@ -26,4 +26,6 @@ jobs:
           zig build --release=small -p .. --prefix-lib-dir .
           cd ../../../..
           zip -r b_x_utils b_x_utils -x "*.rfc" "*.rdb" "b_x_utils/.git/*" "b_x_utils/.github/*" "b_x_utils/.gitmodules" "b_x_utils/.gitignore" "b_x_utils/py_modules/zig_modules/src/*"
+          mv b_x_utils.zip ${{ github.workspace }}
+          cd ${{ github.workspace }}
           gh release create ${{ github.ref_name}} b_x_utils.zip
