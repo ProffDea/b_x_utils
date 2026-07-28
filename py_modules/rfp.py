@@ -1,0 +1,128 @@
+from __future__ import annotations
+
+import sys
+sys.path.append(r"C:\Users\jango\Desktop\b_x_utils\py_modules")
+
+from .rfc import parse_rfc,SortedTileset
+
+from .parsing_funcs import *
+from .rpk import RPK
+
+from .rdb.items import ItemDB,Item
+from .rdb.races import RaceDB
+from .rdb.charroles import RoleDB
+from .rdb.locales import LocaleDB
+
+from .pwr import PowerTree
+
+from dataclasses import dataclass,field
+
+from . import b_funcs as bf
+
+import bpy
+
+import os
+
+@dataclass
+class RFP:
+    dir:       str = ''
+    signature: int = 0xAFDFBD10
+    flags:     int = 0x0
+    name:      str = ''
+    null:      bytes = b''
+    resource:      RPK = field(default_factory = RPK)
+    objlibs:       list[RPK] = field(default_factory = list)
+    textures:      list[RPK] = field(default_factory = list)
+    rml_paths:     list[str] = field(default_factory = list)
+    objects:       RPK = field(default_factory = RPK)
+    factories:     RPK = field(default_factory = RPK)
+    components:    RPK = field(default_factory = RPK)
+    componenttex:  RPK = field(default_factory = RPK)
+    characters:    RPK = field(default_factory = RPK)
+    apparel:       RPK = field(default_factory = RPK)
+    itemdb:        ItemDB = field(default_factory = ItemDB)
+    racedb:        RaceDB = field(default_factory = RaceDB)
+    old_race_names: list[str] = field(default_factory = list)
+    roledb:        RoleDB = field(default_factory = RoleDB)
+    pwrs:          list[PowerTree] = field(default_factory = list)
+    locales:       LocaleDB = field(default_factory = LocaleDB)
+
+    built_props: dict[str,list[bpy.types.Object]] = field(default_factory = dict)
+    built_world_models: dict[str,list[bpy.types.Object]] = field(default_factory = dict)
+    built_char_models: dict[str,list[bpy.types.Object]] = field(default_factory = dict)
+    built_race_models: dict[str,list[bpy.types.Object]] = field(default_factory = dict)
+
+    built_items: dict[Item,bpy.types.Object] = field(default_factory = dict)
+    @classmethod
+    def parse(cls, file_directory: str) -> RFP:
+        rfp_path = os.path.join(file_directory,'Exanima.rfp')
+        if not os.path.exists(rfp_path): raise Exception(f'File directory ({file_directory}) does not contain Exanima.rfp!')
+        file = open(rfp_path,'rb')
+        (signature,flags),name,null = read_uints(file,2),read_name(file),file.read(4)
+        resource = RPK.parse(rpk_path = os.path.join(file_directory,read_string(file)+'.rpk'))
+        return RFP(dir = dir,
+                   signature = signature,
+                   flags = flags,
+                   name = name,
+                   null = name,
+                   resource     = resource,
+                   objlibs      = [RPK.parse(rpk_path = os.path.join(file_directory,read_string(file)+'.rpk')) for _ in range(read_uints(file,1))],
+                   textures     = [RPK.parse(rpk_path = os.path.join(file_directory,read_string(file)+'.rpk')) for _ in range(read_uints(file,1))],
+                   rml_paths    = [read_string(file).lower() for _ in range(read_uints(file,1))],
+                   objects      = RPK.parse(rpk_path = os.path.join(file_directory,'Objects.rpk')),
+                   factories    = RPK.parse(rpk_path = os.path.join(file_directory,'Factories.rpk')),
+                   components   = RPK.parse(rpk_path = os.path.join(file_directory,'Components.rpk')),
+                   componenttex = RPK.parse(rpk_path = os.path.join(file_directory,'Componenttex.rpk')),
+                   characters   = RPK.parse(rpk_path = os.path.join(file_directory,'Characters.rpk')),
+                   apparel      = RPK.parse(rpk_path = os.path.join(file_directory,'Apparel.rpk')),
+                   #Investigate how to optimize the stuff after this
+                   itemdb       = resource.parse_itemdb(),
+                   racedb       = resource.parse_entry('races.rdb') if 'races.rdb' in resource.lookup_table else None,
+                   old_race_names = ['human', 'skel', 'ancient', 'ogre', 'hrtogr', 'hrtafael', 'hrtaghla', 'hrtaghlh', 'gobbler', 'tntclskl',
+                                      'shdwskel', 'manipula', 'holyskel', 'embrskel', #Hellmode races
+                                      '', 'wraithha', 'golem', 'glmbsa', 'glmsta', ''],
+                   roledb       = resource.parse_entry('charroles.rdb'),
+                   pwrs         = {1: resource.parse_entry('pwr_mind.pwr'),
+                                   2: resource.parse_entry('pwr_force.pwr'),
+                                   3: None,
+                                   4: resource.parse_entry('pwr_energy.pwr') if 'pwr_energy.pwr' in resource.lookup_table else None,
+                                   5: None,
+                                   6: resource.parse_entry('pwr_displace.pwr') if 'pwr_displace.pwr' in resource.lookup_table else None},
+                   locales      = resource.parse_entry('locales.rdb'))
+    def get_set(self, set_name: str) -> SortedTileset:
+        import_name = set_name
+        set_name = set_name[:-4].lower() #Cut off .rfc and make it lowercase.
+        #Store them in the blend file and reuse them. Prevents performing these expensive mergers.
+        if set_name in bpy.data.collections: return SortedTileset.sort(name = set_name, objs = bpy.data.collections[set_name].objects) 
+        set_col = bpy.data.collections.new(set_name)
+        print(f'Importing tileset {import_name}')
+        raw_objs = self.resource.parse_entry(import_name, self, None, True)
+        roots = [obj for obj in raw_objs if not obj.parent]
+        print(f'\tMerging {len(roots)} hierarchies...')
+        mobjs = [bf.merge_hierarchy(hierarchy = [root] + [child for child in root.children_recursive if '+F' not in child.name], col = set_col) for root in roots]
+        return SortedTileset.sort(name = set_name, objs = mobjs)
+    def get_prop(self, prop_name: str, col: bpy.types.Collection | None) -> list[bpy.types.Object] | None:
+        if prop_name in self.built_props:
+            return bf.copy_objects(self.built_props[prop_name], col)
+        # print(f'Getting prop {prop_name}')
+        for objlib in self.objlibs:
+            if prop_name in objlib.lookup_table:
+                objs = objlib.parse_entry(prop_name, self, None, True)
+                if col:
+                    for obj in objs: col.objects.link(obj)
+                self.built_props[prop_name] = objs
+                return objs
+        else: return None
+    def get_world_model(self, model_name: str, col: bpy.types.Collection) -> list[bpy.types.Object] | None:
+        model_name = model_name.lower()
+        if model_name in self.built_world_models:
+            return bf.copy_objects(self.built_world_models[model_name], col)
+        elif model_name in self.objects.lookup_table:
+            objs = self.objects.parse_entry(model_name, self, None, True)
+            if col:
+                for obj in objs: col.objects.link(obj)
+            self.built_world_models[model_name] = objs
+            return objs
+        else: 
+            raise Exception(f'Failed to get world model {model_name}')
+            return None
