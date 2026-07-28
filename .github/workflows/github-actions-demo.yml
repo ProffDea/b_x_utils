@@ -3,9 +3,7 @@
 # - go into /home/runner/work/b_x_utils/b_x_utils with ${{ github.workspace }}
 # - make sure cpython is cloned with git submodule init/update
 # - compile zig module
-# - zip up the directory with the included build while excluding some files.
-#   Currently *.rdb, *.rfc, .git/, .github/, and the zig_modules/src/ folder are
-#   excluded.
+# - zip up the directory with the included build while excluding unnecessary files.
 name: Publish
 on:
   push:
@@ -23,7 +21,7 @@ jobs:
       - uses: mlugg/setup-zig@v2
       - run: |
           cd ${{ github.workspace }}
-          #git submodule init && git submodule update
+          git submodule init && git submodule update
           cd py_modules/zig_modules/src
           zig build --release=small -p .. --prefix-lib-dir .
           cd ../../../..
