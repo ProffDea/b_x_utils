@@ -1,0 +1,4 @@
+[submodule "cpython"]
+	path = "py_modules/zig_modules/src/cpython"
+	url = "https://github.com/python/cpython"
+	shallow = true
