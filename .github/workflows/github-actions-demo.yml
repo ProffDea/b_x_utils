@@ -4,6 +4,9 @@
 # - make sure cpython is cloned with git submodule init/update
 # - compile zig module
 # - zip up the directory with the included build while excluding unnecessary files.
+#
+# mlugg/setup-zig@v2 will create ${{ github.workspace }}/.zig-cache/ folder which
+# gets excluded when running the zip step
 name: Publish
 on:
   push:
@@ -25,7 +28,7 @@ jobs:
           cd py_modules/zig_modules/src
           zig build --release=small -p .. --prefix-lib-dir .
           cd ../../../..
-          zip -r b_x_utils b_x_utils -x "*.rfc" "*.rdb" "b_x_utils/.git/*" "b_x_utils/.github/*" "b_x_utils/.gitmodules" "b_x_utils/.gitignore" "b_x_utils/py_modules/zig_modules/src/*"
+          zip -r b_x_utils b_x_utils -x "*.rfc" "*.rdb" "b_x_utils/.git/*" "b_x_utils/.github/*" "b_x_utils/.gitmodules" "b_x_utils/.gitignore" "b_x_utils/py_modules/zig_modules/src/*" "b_x_utils/.zig-cache/*"
           mv b_x_utils.zip ${{ github.workspace }}
           cd ${{ github.workspace }}
           gh release create ${{ github.ref_name}} b_x_utils.zip
