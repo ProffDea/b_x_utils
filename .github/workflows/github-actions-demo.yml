@@ -20,4 +20,4 @@ jobs:
         run: |
           ls ${{ github.workspace }}
       - run: echo "🍏 This job's status is ${{ job.status }}."
-      - run: echo "tag ${{ steps.version.outputs.tag }}"
+      - run: echo "tag ${{ steps.push.outputs.tag }}"
