@@ -21,3 +21,4 @@ jobs:
           ls ${{ github.workspace }}
       - run: echo "🍏 This job's status is ${{ job.status }}."
       - run: echo "tag ${{ github.ref_name }}"
+      - run: gh release create ${{ github.ref_name}}
